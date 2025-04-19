@@ -1,0 +1,10 @@
+id = "godot-mcp"
+name = "Godot Context Server"
+description = "Model Context Server for Godot"
+version = "0.0.1"
+schema_version = 1
+authors = ["Artur Shirokov <artur.shirokov@gmail.com>"]
+repository = "https://github.com/AhegaoBurger/Godot-MCP"
+
+[context_servers.godot-context-server]
+name = "Godot Context Server"

@@ -1,0 +1,12 @@
+[package]
+name = "godot-mcp"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "src/mcp_server_godot.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+serde = "1.0"
+zed_extension_api = "0.2.0"
