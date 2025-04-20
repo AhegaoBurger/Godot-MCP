@@ -43,85 +43,140 @@ var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
     }
     return to.concat(ar || Array.prototype.slice.call(from));
 };
-import { FastMCP } from 'fastmcp';
-import { nodeTools } from './tools/node_tools.js';
-import { scriptTools } from './tools/script_tools.js';
-import { sceneTools } from './tools/scene_tools.js';
-import { editorTools } from './tools/editor_tools.js';
-import { getGodotConnection } from './utils/godot_connection.js';
+// File: /server/src/index.ts
+import { FastMCP } from "fastmcp";
+import { nodeTools } from "./tools/node_tools.js";
+import { scriptTools } from "./tools/script_tools.js";
+import { sceneTools } from "./tools/scene_tools.js";
+import { editorTools } from "./tools/editor_tools.js";
+import { assetTools } from "./tools/asset_tools.js";
+import { enhancedTools } from "./tools/enhanced_tools.js";
+import { scriptResourceTools } from "./tools/script_resource_tools.js";
+import { getGodotConnection } from "./utils/godot_connection.js";
 // Import resources
-import { sceneListResource, sceneStructureResource } from './resources/scene_resources.js';
-import { scriptResource, scriptListResource, scriptMetadataResource } from './resources/script_resources.js';
-import { projectStructureResource, projectSettingsResource, projectResourcesResource } from './resources/project_resources.js';
-import { editorStateResource, selectedNodeResource, currentScriptResource } from './resources/editor_resources.js';
+import { sceneListResource, sceneStructureResource, fullSceneTreeResource, } from "./resources/scene_resources.js";
+import { scriptResource, scriptListResource, scriptMetadataResource, } from "./resources/script_resources.js";
+import { projectStructureResource, projectSettingsResource, projectResourcesResource, } from "./resources/project_resources.js";
+import { editorStateResource, selectedNodeResource, currentScriptResource, } from "./resources/editor_resources.js";
+import { assetListResource } from "./resources/asset_resources.js";
+import { debugOutputResource } from "./resources/debug_resources.js";
 /**
  * Main entry point for the Godot MCP server
  */
 function main() {
     return __awaiter(this, void 0, void 0, function () {
-        var server, godot, error_1, err, cleanup;
+        var server, allTools, godot, err, cleanup;
         return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    console.error('Starting Godot MCP server...');
-                    server = new FastMCP({
-                        name: 'GodotMCP',
-                        version: '1.0.0',
-                    });
-                    // Register all tools
-                    __spreadArray(__spreadArray(__spreadArray(__spreadArray([], nodeTools, true), scriptTools, true), sceneTools, true), editorTools, true).forEach(function (tool) {
-                        server.addTool(tool);
-                    });
-                    // Register all resources
-                    // Static resources
-                    server.addResource(sceneListResource);
-                    server.addResource(scriptListResource);
-                    server.addResource(projectStructureResource);
-                    server.addResource(projectSettingsResource);
-                    server.addResource(projectResourcesResource);
-                    server.addResource(editorStateResource);
-                    server.addResource(selectedNodeResource);
-                    server.addResource(currentScriptResource);
-                    server.addResource(sceneStructureResource);
-                    server.addResource(scriptResource);
-                    server.addResource(scriptMetadataResource);
-                    _a.label = 1;
-                case 1:
-                    _a.trys.push([1, 3, , 4]);
-                    godot = getGodotConnection();
-                    return [4 /*yield*/, godot.connect()];
-                case 2:
-                    _a.sent();
-                    console.error('Successfully connected to Godot WebSocket server');
-                    return [3 /*break*/, 4];
-                case 3:
-                    error_1 = _a.sent();
-                    err = error_1;
-                    console.warn("Could not connect to Godot: ".concat(err.message));
-                    console.warn('Will retry connection when commands are executed');
-                    return [3 /*break*/, 4];
-                case 4:
-                    // Start the server
-                    server.start({
-                        transportType: 'stdio',
-                    });
-                    console.error('Godot MCP server started');
-                    cleanup = function () {
-                        console.error('Shutting down Godot MCP server...');
-                        var godot = getGodotConnection();
-                        godot.disconnect();
-                        process.exit(0);
-                    };
-                    process.on('SIGINT', cleanup);
-                    process.on('SIGTERM', cleanup);
-                    return [2 /*return*/];
+            console.error("Starting Enhanced Godot MCP server...");
+            server = new FastMCP({
+                name: "EnhancedGodotMCP",
+                version: "1.1.0",
+            });
+            // --- BEGIN FIX: Attach Error Handler to Session on Connect ---
+            server.on("connect", function (_a) {
+                var session = _a.session;
+                console.error("MCP Session Connected. Client Capabilities:", session.clientCapabilities);
+                // Attach the error handler to *this specific session*
+                session.on("error", function (_a) {
+                    var error = _a.error;
+                    // Destructure error from the event payload
+                    console.error("--- MCP Session Error Caught ---");
+                    if (error instanceof Error) {
+                        console.error("Error Name: ".concat(error.name));
+                        console.error("Error Message: ".concat(error.message));
+                        // Check if it's the timeout error
+                        if (error.message.includes("Request timed out") ||
+                            error.code === -32001) {
+                            console.error("Type: Request Timeout");
+                            var errorData_1 = error.data;
+                            if (errorData_1 && typeof errorData_1 === "object" && errorData_1.timeout) {
+                                console.error("Timeout Duration: ".concat(errorData_1.timeout, "ms"));
+                            }
+                        }
+                        else if (error.code) {
+                            console.error("Error Code: ".concat(error.code));
+                        }
+                        var errorData = error.data;
+                        if (errorData) {
+                            console.error("Error Data: ".concat(JSON.stringify(errorData)));
+                        }
+                        console.error("Stack Trace:\n".concat(error.stack));
+                    }
+                    else {
+                        console.error("Caught non-Error object:", error);
+                    }
+                    console.error("-------------------------------");
+                    // Process continues, error is logged but not fatal.
+                });
+                // Optional: Handle other session events if needed
+                session.on("rootsChanged", function (_a) {
+                    var roots = _a.roots;
+                    console.error("MCP Session Roots Changed:", roots);
+                });
+            });
+            // Handle disconnects if needed (optional)
+            server.on("disconnect", function (_a) {
+                var session = _a.session;
+                console.error("MCP Session Disconnected.");
+                // Perform any cleanup specific to this session if necessary
+            });
+            allTools = __spreadArray(__spreadArray(__spreadArray(__spreadArray(__spreadArray(__spreadArray(__spreadArray([], nodeTools, true), scriptTools, true), sceneTools, true), editorTools, true), assetTools, true), enhancedTools, true), scriptResourceTools, true);
+            allTools.forEach(function (tool) {
+                server.addTool(tool);
+                console.error("Registered tool: ".concat(tool.name));
+            });
+            // Register all resources
+            server.addResource(sceneListResource);
+            server.addResource(scriptListResource);
+            server.addResource(projectStructureResource);
+            server.addResource(projectSettingsResource);
+            server.addResource(projectResourcesResource);
+            server.addResource(editorStateResource);
+            server.addResource(selectedNodeResource);
+            server.addResource(currentScriptResource);
+            server.addResource(sceneStructureResource);
+            server.addResource(scriptResource);
+            server.addResource(scriptMetadataResource);
+            server.addResource(fullSceneTreeResource);
+            server.addResource(debugOutputResource);
+            server.addResource(assetListResource);
+            console.error("All resources and tools registered");
+            // Try to connect to Godot
+            try {
+                godot = getGodotConnection();
+                // Don't await connection here, let it happen lazily or handle errors
+                godot.connect().catch(function (err) {
+                    console.warn("Initial connection attempt failed: ".concat(err.message));
+                    console.warn("Will retry connection when commands are executed");
+                });
             }
+            catch (error) {
+                err = error;
+                console.warn("Could not connect to Godot: ".concat(err.message));
+                console.warn("Will retry connection when commands are executed");
+            }
+            // Start the server AFTER the error handler is attached
+            server.start({
+                transportType: "stdio",
+            });
+            console.error("Enhanced Godot MCP server started");
+            console.error("Ready to process commands from Claude or other AI assistants");
+            cleanup = function () {
+                console.error("Shutting down Enhanced Godot MCP server...");
+                var godot = getGodotConnection();
+                godot.disconnect();
+                process.exit(0);
+            };
+            process.on("SIGINT", cleanup);
+            process.on("SIGTERM", cleanup);
+            return [2 /*return*/];
         });
     });
 }
 // Start the server
 main().catch(function (error) {
-    console.error('Failed to start Godot MCP server:', error);
+    // This catches errors during the initial setup in main()
+    console.error("Failed to start Enhanced Godot MCP server:", error);
     process.exit(1);
 });
 //# sourceMappingURL=index.js.map
